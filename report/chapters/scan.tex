@@ -1,0 +1,112 @@
+\section{Reduction and scan}
+\label{sec:scan}
+
+Reduction and scan are the two families where the roof is entirely a bandwidth
+question, so the ladder is a ladder of passes over the input rather than of
+arithmetic. Unlike the FFT family, this one has no traffic accounting problem:
+round 17 measured every rung against its declared model at $N = 2^{26}$ and every
+row landed inside 4 percent. The reduction ladder reaches CUB parity, 100.19
+percent at $2^{28}$, and the look-back scan reaches 95.49 percent. Both bandwidth
+clauses pass at every size; the CUB parity clause for scan misses by under a point
+at two of the five sizes, and Section \ref{sec:scangate} says exactly what that is
+made of.
+
+\subsection{The ladder is about passes, not instructions}
+
+The scan ladder has five rungs. The first is a Hillis-Steele block scan, which is
+work inefficient by construction: $O(N \log N)$ work at block scope. The second is
+Blelloch's work efficient upsweep and downsweep with bank conflict
+padding~\cite{blelloch1990}, which does $O(N)$ work and pays for it in barriers.
+Those two are block primitives, not device wide scans, so both are wrapped in the
+same scan-then-propagate decomposition the third rung uses; wrapping them in
+different ones would have made the difference between the rows two changes rather
+than one. The third rung moves about $4N$ bytes, the fourth (reduce then scan) about
+$3N$, and the fifth, decoupled look-back, about $2N$, which is the lower bound for
+the problem.
+
+Decoupled look-back~\cite{merrill2016scan} is the top rung and it carries three
+constraints that are not optional. The tile index comes from an atomic increment on
+a global counter and never from the block index, because a block that claimed index
+$k$ did so after every block holding a lower index had already started, so those
+blocks are resident and can make progress; indexing by block index would let a
+resident block wait on one the scheduler has not launched, which deadlocks. The
+status word is published with release semantics and read with acquire semantics,
+with the aggregate and the inclusive prefix sitting beside the flag as plain
+stores, which is exactly what release and acquire exist to order. And the status
+array is zeroed by a memset enqueued ahead of the kernel and never inside it,
+because a block cannot zero its own slot when a predecessor may already have read
+it. That memset is real traffic and the plan counts it in the model rather than
+leaving it out to make the top rung look cheaper.
+
+\subsection{Determinism has a price and it is measured, not defended}
+
+Floating point addition is not associative, so a reduction gives a different answer
+when it combines its partials in a different order, and every fast rung above lets
+the launch decide that order. That is not a defect; it is what a fast reduction
+costs.
+
+A deterministic rung exists for both families and makes the answer bit identical
+three ways. The block count is a pure function of the length and never asks the
+occupancy API, so the same input gives the same grid on a busy device, an idle one,
+or a different card. The element to thread mapping follows from that grid, and each
+thread combines its own elements in index order. And the two levels are combined by
+an explicit halving tree, so the shape of the tree is a property of the block size
+rather than of the schedule. Decoupled look-back cannot make that promise, because
+how many predecessors a tile has to combine depends on which of them happened to
+finish first, which is why the deterministic scan is reduce then scan and is a
+separate name rather than an alias.
+
+The artifact for that claim is committed:
+\texttt{experiments/results/scan\_determinism.txt} holds the output hashes from ten
+consecutive runs at $N = 2^{24}$ and $N = 2^{28}$. It is a determinism artifact
+produced at unlocked clocks, not a performance artifact, and it is valid as such:
+the value it records is a property of the arithmetic and has nothing to do with how
+fast the machine was running. The cost of determinism is now a benchmark row of its
+own next to the fast rungs, and it is smaller than I expected. At $2^{28}$ the
+deterministic scan runs at 68.88 percent of CUB against the look-back rung's 95.49,
+so ordering costs about a quarter of the throughput; on the reduction side the
+deterministic rung measures 100.07 percent of CUB, which is to say it costs nothing
+measurable at all. A fixed grid and an index ordered combination are cheap for a
+reduction and expensive for a scan, because only the scan gives up the single pass.
+
+\begin{table}[htbp]
+\centering
+\input{tables/scan.tex}
+\caption{The reduction and scan ladders, measured at locked clocks. Bytes moved per
+element is derived from the decomposition. The throughput column is effective GB/s
+rather than GFLOP/s: these kernels do a fixed two or three FLOP per element and the
+quantity that means anything for them, and that the gate is stated in, is bytes
+moved per second.}
+\label{tab:scan}
+\end{table}
+
+\subsection{The CUB parity clause, and what the miss is made of}
+\label{sec:scangate}
+
+The gate asks the top scan rung to land within 5 percent of CUB. It measures 94.15
+percent at $2^{26}$, 94.52 at $2^{27}$ and 95.49 at $2^{28}$, so it fails at the
+first two by 0.85 and 0.48 points and passes at the third. Round 17 says what the
+gap is, and it is not traffic: look-back moves 518.20 MB against CUB's 516.21 MB,
+0.4 percent more, which is nothing.
+
+It is tile size. \texttt{lookback\_kernel} runs 256 threads at 8 items each, so
+2,048 elements per tile over 32,768 blocks, at 34 registers and 98.42 percent
+achieved occupancy. CUB's \texttt{DeviceScanKernel} runs 416 threads over 8,491
+blocks, which is 7,904 elements per tile, at 48 registers and 78.78 percent
+achieved occupancy. CUB carries 3.9 times more data per tile, so it pays the
+decoupled look back handshake 3.9 times less often, and the counters show the cost
+of paying it more often: 5,788,563 shared load wavefronts against 5,368,287, and
+480,147 bank conflicts against 290,681. DRAM Throughput lands at 82.04 percent for
+look-back and 86.98 for CUB. Raising items per thread is the change to try, and it
+is a tuning change rather than a redesign, which is why the clause is recorded as
+missed rather than argued away.
+
+The same round settles the Blelloch padding question. There is no pre padding page
+committed anywhere in this repository, so there is no before and after to show;
+what is committed is the padded state, and it measures 138,405 conflicts against
+17,177,765 shared load wavefronts at $2^{26}$, which is 0.81 percent. The padding
+works. What the page also shows is the cost of the rung itself: 17.2 million shared
+load wavefronts against 5.8 million for look-back at the same $N$, and 1067.46 MB
+of DRAM traffic against 518.20 MB. That is why Blelloch sits at 37.53 percent of
+CUB in the committed rows. The work efficient formulation does not pay for itself
+on this part, and that is now a measured statement rather than a suspicion.

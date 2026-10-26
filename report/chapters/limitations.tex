@@ -1,0 +1,77 @@
+\section{Limitations and threats to validity}
+\label{sec:limitations}
+
+\paragraph{One GPU, one vendor, one toolkit, one part class.} Every number here
+comes from a single RTX 5070 running CUDA Toolkit 13.3 under WSL2. It is a
+consumer part, not a datacenter one: 12 GB of GDDR7 rather than HBM, a different
+memory system, a different power and clock envelope, and no NVLink. Nothing in this
+report has been run on a second card, a second toolkit version, or a second vendor.
+Where a claim depends on the hardware, and most of them do, it is a claim about
+this configuration.
+
+\paragraph{The negative result is a single GPU finding.} Section \ref{sec:negative}
+shows shared memory tiling losing to naive, and names the mechanism: the last level
+cache absorbs the redundant traffic that tiling exists to remove. That mechanism is
+a statement about the ratio of cache capacity to working set, which means the sign
+of the result should flip on a part with a smaller cache or a larger working set,
+and I have not shown that. The study that would establish it is a crossover
+experiment across three generations, predicting the crossing point from L2 capacity
+and confirming it on Ampere, Ada and Blackwell. It needs hardware this machine does
+not have, and it is scoped to a future release rather than claimed here. Until
+somebody runs it, the correct reading of Section \ref{sec:negative} is "on this
+part", not "in general".
+
+\paragraph{Provenance.} Corrections A1 and A4 are closed. Every row of the
+committed summary carries a commit hash that resolves and a locked clock, and a
+style gate fails the build on any recorded hash that does not resolve. Seven dead
+v1 hashes are still allowed through by
+\texttt{experiments/results/legacy\_hashes.txt}, and that is deliberate and scoped:
+they stamp archived material that is kept in the tree as history, the superseded
+rows in \texttt{sweep.jsonl} and the round 01 to 09 profiler pages. No figure in
+this report is traceable to one of them.
+
+\paragraph{Contaminated denominators, and what survived them.} Correction A2
+recorded setup work inside two vendor timed regions. The wrappers were fixed and
+the sweep re-run, so the percentages here are measured against a cuSPARSE plan
+built once and reused and against a TRSM baseline whose restore copy is outside the
+window. The v1 percentages are not corrected, they are withdrawn: the setup cannot
+be subtracted after the fact, and the generator still prints the withdrawal for any
+row that names no matrix, so a v1 row can never be read as though it had been
+measured this way.
+
+\paragraph{The traffic column is not in the summary yet.} Round 15 to 17 measured
+\texttt{dram\_\_bytes.sum} for the SpMV, FFT, scan and reduction rungs, and those
+figures are quoted in this report and in the diagnostic log. The
+\texttt{dram\_bytes\_sum} column of \texttt{summary.csv} still reads
+\texttt{pending ncu round}, so a reader who wants the traffic behind a specific row
+has to go to the profiler page rather than to the summary. Re-summarizing the sweep
+is what closes that, and it has not been done.
+
+\paragraph{The roofline chart is measured at a different clock from the ladder.}
+The ceilings come from a device probe at 2842 MHz; every ladder row is at a 2497
+MHz lock. Percent of roof is quoted against the locked clock roof throughout, but
+the chart itself is drawn against the probe's ceilings, so a point read off the
+figure by eye is not the same quantity as a percent of roof quoted in the text.
+
+\paragraph{What the CI bounds do and do not cover.} The performance regression job
+compares a quick sweep against a committed baseline, which catches a large step
+change on this machine. It does not establish that a small difference is real: a
+quick sweep is fewer repetitions than the full protocol, and it runs on whatever
+thermal state the machine happens to be in. The full protocol's five independent
+process repeats and their bootstrap intervals are recorded per row and drawn as
+error bars on the ladder figure, so a difference between two rows can now be judged
+rather than guessed at. The regression job uses both halves of that: a row counts
+as a regression only when it is more than the tolerance slower \emph{and} the two
+intervals do not overlap.
+
+\paragraph{Claims I am carrying from elsewhere.} The observation that cuBLAS
+dispatches Ampere generation kernels for FP16 GEMM on consumer Blackwell is
+somebody else's measurement~\cite{cloudrift}, not mine. I use it as context for why
+a gap exists at all. I have not reproduced it, and no result in this report depends
+on it being true.
+
+\paragraph{Benchmark scope.} The sweep covers four square shapes for GEMM and a
+handful of sizes elsewhere. Square shapes are the friendliest case for a fixed tile
+and the least interesting one for a dispatch heuristic. Non square, batched, and
+strided cases are supported by the API and tested for correctness, but they are not
+swept, so nothing here should be read as a performance claim about them.

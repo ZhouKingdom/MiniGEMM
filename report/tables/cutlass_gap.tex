@@ -1,0 +1,14 @@
+\begin{tabular}{lrrrr}
+\toprule
+shape & mma\_opt GFLOP/s & cutlass GFLOP/s & cuBLAS GFLOP/s & mma\_opt as percent of cutlass \\
+\midrule
+128 cubed & 431 & pending & 745 & pending \\
+256 cubed & 2,422 & pending & 4,387 & pending \\
+512 cubed & 12,175 & pending & 22,672 & pending \\
+768 cubed & 28,368 & pending & 37,648 & pending \\
+1024 cubed & 32,025 & 35,209 & 48,210 & 91.0 \\
+2048 cubed & 48,559 & 52,506 & 56,370 & 92.5 \\
+4096 cubed & 54,602 & 58,669 & 57,568 & 93.1 \\
+8192 cubed & 56,375 & 60,154 & 59,450 & 93.7 \\
+\bottomrule
+\end{tabular}

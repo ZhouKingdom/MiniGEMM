@@ -1,0 +1,60 @@
+# Build trees
+/build/
+/out/
+**/build/
+cmake-build-*/
+
+# CUTLASS and other fetched content
+_deps/
+/third_party/
+
+# Generated API documentation. `doxygen Doxyfile` rebuilds it from the headers,
+# so the tree carries the source of truth and not the render.
+/docs/api/
+
+# Experiment outputs. The canonical results are committed: summary.csv, the sweep
+# JSONL, the roofline CSVs, and the ncu diagnostic text pages and round metadata.
+# A clean clone has to be able to rebuild every figure and table from what is in
+# the tree (defect A7). Only the per run scratch summaries and the large binary
+# ncu and nsys reports stay out, because both are regenerable.
+experiments/results/summary_*.csv
+
+# Nsight artifacts
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+
+# LaTeX build junk. Both documents build out of report/ into report/build/, and
+# the PDFs are not committed: they are attached to the GitHub release at tag time.
+# reports/ was the old committed-PDF directory and is gone; it stays listed so a
+# stale working copy does not put the binaries back.
+report/build/
+/reports/
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor and OS
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Agent tooling and process files (never published)
+CLAUDE.md
+.claude/
+Cuda-kernel-library V2.md
+tasks/
+BOARD.md

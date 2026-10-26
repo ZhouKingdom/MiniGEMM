@@ -1,0 +1,91 @@
+% The main report. Every figure and every table under figures/ and tables/ is
+% written by scripts/gen_report_assets.py from the committed results files;
+% nothing in this document is hand copied from a benchmark run. Build it with
+% `make report`, which regenerates the assets first and then runs latexmk.
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[hidelinks]{hyperref}
+\usepackage{parskip}
+
+\graphicspath{{figures/}}
+
+% Generated caption fragments. They are loaded here, in the preamble, and used as
+% macros in the figure captions: an \input inside a \caption breaks when hyperref
+% writes the caption out to the list of figures. Both files are written by
+% scripts/gen_report_assets.py and say what the committed data actually carries.
+\input{tables/ladder_caption.tex}
+\input{tables/roofline_caption.tex}
+
+\title{CUDA Kernel Library\\[4pt]
+\large Driving a GEMM from naive to compute bound on an RTX 5070}
+\author{Olajide Badejo}
+\date{2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report documents a CUDA kernel library whose general matrix multiply path is
+driven, through explicit optimization steps and Nsight Compute diagnostic rounds,
+from a naive baseline to a compute bound tensor core kernel. Every performance
+figure is my kernel measured against the vendor library (cuBLAS, cuSPARSE,
+cuFFT, or CUB) on one GPU, an NVIDIA RTX 5070, in the same process. There are no
+cross device comparisons. The result that shaped the work is a negative one:
+shared memory tiling, the first optimization every course teaches, is 19.6 percent
+slower than the naive kernel it replaces on this cache rich part, and Section
+\ref{sec:negative} reports that as a finding in its own right. The top FP16
+kernel reaches 94.8 percent of cuBLAS at both 4096 and 8192 cubed, a geometric
+mean of 84.7 percent from 1024 to 8192 cubed, which is 88.98 and 91.87 percent of
+the hardware tensor roof at the locked clock. Alongside the GEMM ladder the library
+carries GEMV, TRSM, CSR SpMV, FFT and convolution, reduction and scan, and a
+cuSOLVER wrapper, all verified against the vendor library, with a roofline whose
+compute ceilings come from the hardware rather than from a vendor library.
+
+Every figure here comes from one campaign of 984 rows at a locked 2497 MHz
+graphics clock, five independent process repeats per configuration with a
+bootstrap interval on each, described in Section \ref{sec:repro}. Four gate
+clauses failed and are reported with the mechanism named rather than restated:
+the compute bound gate is one clause short at 8192 cubed on L2 residency, merge
+path SpMV misses its bar on one power law matrix because of the gather, the FFT
+ladder trails cuFFT on the number of global passes it makes, and the look-back
+scan misses CUB parity by under a point at two of five sizes on tile size. Two
+columns remain unmeasured and read \emph{pending} rather than being estimated.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\input{chapters/introduction.tex}
+\input{chapters/background.tex}
+\input{chapters/related_work.tex}
+\input{chapters/methodology.tex}
+\input{chapters/gemm.tex}
+\input{chapters/gemm_mechanisms.tex}
+\input{chapters/accuracy.tex}
+\input{chapters/cutlass.tex}
+\input{chapters/sass.tex}
+\input{chapters/sparse.tex}
+\input{chapters/fft.tex}
+\input{chapters/scan.tex}
+\input{chapters/families.tex}
+\input{chapters/roofline.tex}
+\input{chapters/discussion.tex}
+\input{chapters/limitations.tex}
+\input{chapters/reproducibility.tex}
+\input{chapters/conclusion.tex}
+
+% Every record in refs.bib is cited from the prose above. The \nocite guard is
+% belt and braces: with the plain style an uncited record is dropped without a
+% warning, which is how the v1 report shipped a bibliography missing four of its
+% six entries.
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\end{document}
