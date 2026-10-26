@@ -9,8 +9,8 @@ abstract: >-
 type: software
 version: 1.1.0
 license: MIT
-repository-code: "https://github.com/Olajide-Badejo/CUDA-Kernel-Library"
-url: "https://github.com/Olajide-Badejo/CUDA-Kernel-Library"
+repository-code: "https://github.com/ZhouKingdom/MiniGEMM"
+url: "https://github.com/ZhouKingdom/MiniGEMM"
 authors:
   - family-names: Badejo
     given-names: Olajide
